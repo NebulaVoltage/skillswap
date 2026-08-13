@@ -427,62 +427,131 @@ export const api = {
       {
         uid: "demo-rahul",
         name: "Rahul Sharma",
-        bio: "Full-stack developer who loves building web apps and hackathon prototypes.",
+        bio: "Computer science student passionate about full-stack development and competitive programming.",
         college: "Delhi Technological University",
         yearOfStudy: "2nd Year",
         avatar: "RS",
-        teachSkills: ["React", "JavaScript", "HTML & CSS"],
-        learnSkills: ["Machine Learning", "Python"],
-        availability: "Flexible"
+        teachSkills: ["Python", "React", "Java", "Data Structures"],
+        learnSkills: ["Machine Learning", "Cloud Computing"],
+        availability: "Weekdays evenings"
       },
       {
         uid: "demo-ananya",
         name: "Ananya Reddy",
-        bio: "Deep learning engineer. Enthusiastic about computer vision and NLP applications.",
+        bio: "AI enthusiast exploring computer vision, deep learning, and intelligent applications.",
         college: "IIIT Hyderabad",
         yearOfStudy: "4th Year",
         avatar: "AR",
-        teachSkills: ["Python", "Machine Learning", "Embedded Systems"],
-        learnSkills: ["UI/UX", "Graphic Design"],
+        teachSkills: ["Machine Learning", "Python", "Computer Vision", "TensorFlow"],
+        learnSkills: ["React", "UI/UX"],
         availability: "Weekends"
       },
       {
         uid: "demo-arjun",
         name: "Arjun Rao",
-        bio: "Hardware hacker. Building IoT devices and micro-controller modules.",
+        bio: "ECE student building embedded systems, IoT prototypes, and Arduino projects.",
         college: "RV College of Engineering",
         yearOfStudy: "3rd Year",
         avatar: "AJ",
-        teachSkills: ["Arduino", "Embedded Systems", "IoT"],
-        learnSkills: ["React", "Python"],
-        availability: "Flexible"
+        teachSkills: ["Arduino", "Embedded Systems", "IoT", "C/C++"],
+        learnSkills: ["Machine Learning", "PCB Design"],
+        availability: "Weekday evenings"
       },
       {
         uid: "demo-priya",
         name: "Priya Nair",
-        bio: "UI/UX designer. Making interfaces accessible, clean, and delightful.",
+        bio: "Creative designer interested in building beautiful digital products and user experiences.",
         college: "PES University",
         yearOfStudy: "4th Year",
         avatar: "PN",
-        teachSkills: ["UI/UX", "Graphic Design", "Photography"],
-        learnSkills: ["React", "JavaScript"],
-        availability: "Flexible"
+        teachSkills: ["UI/UX Design", "Figma", "Graphic Design", "Prototyping"],
+        learnSkills: ["React", "Frontend Development"],
+        availability: "Saturday and Sunday"
+      },
+      {
+        uid: "demo-karthik",
+        name: "Karthik Varma",
+        bio: "Web developer focused on modern JavaScript applications and scalable frontend systems.",
+        college: "MSRIT",
+        yearOfStudy: "3rd Year",
+        avatar: "KV",
+        teachSkills: ["JavaScript", "React", "TypeScript", "HTML/CSS"],
+        learnSkills: ["Python", "AI"],
+        availability: "Weekdays"
+      },
+      {
+        uid: "demo-meera",
+        name: "Meera Iyer",
+        bio: "Data enthusiast working on analytics, visualization, and practical machine learning projects.",
+        college: "BITS Pilani",
+        yearOfStudy: "3rd Year",
+        avatar: "MI",
+        teachSkills: ["Python", "Data Analysis", "SQL", "Data Visualization"],
+        learnSkills: ["Deep Learning", "Cloud Computing"],
+        availability: "Evenings"
+      },
+      {
+        uid: "demo-aditya",
+        name: "Aditya Kumar",
+        bio: "Cybersecurity learner interested in ethical security, networking, and secure development.",
+        college: "VIT Vellore",
+        yearOfStudy: "3rd Year",
+        avatar: "AK",
+        teachSkills: ["Networking", "Linux", "Cybersecurity Basics", "Git"],
+        learnSkills: ["Cloud Security", "Penetration Testing"],
+        availability: "Weekends"
+      },
+      {
+        uid: "demo-sneha",
+        name: "Sneha Patel",
+        bio: "Content creator and photographer who enjoys combining technology with visual storytelling.",
+        college: "NID Ahmedabad",
+        yearOfStudy: "4th Year",
+        avatar: "SP",
+        teachSkills: ["Photography", "Video Editing", "Canva", "Content Creation"],
+        learnSkills: ["Graphic Design", "UI/UX"],
+        availability: "Friday evenings and weekends"
+      },
+      {
+        uid: "demo-vikram",
+        name: "Vikram Singh",
+        bio: "Competitive programmer and software engineering enthusiast who enjoys algorithms and problem solving.",
+        college: "IIT Bombay",
+        yearOfStudy: "4th Year",
+        avatar: "VS",
+        teachSkills: ["C++", "Data Structures", "Algorithms", "Competitive Programming"],
+        learnSkills: ["System Design", "Machine Learning"],
+        availability: "Weekdays evenings"
+      },
+      {
+        uid: "demo-ishita",
+        name: "Ishita Rao",
+        bio: "Electronics student exploring robotics, automation, and intelligent hardware systems.",
+        college: "COEP Pune",
+        yearOfStudy: "3rd Year",
+        avatar: "IR",
+        teachSkills: ["Robotics", "Arduino", "Electronics", "Embedded C"],
+        learnSkills: ["Computer Vision", "Python"],
+        availability: "Saturday mornings"
       }
     ];
 
     const getCategory = (name: string) => {
-      if (["React", "JavaScript", "HTML & CSS", "Python"].includes(name)) return "Programming";
-      if (["Machine Learning"].includes(name)) return "AI & ML";
-      if (["Arduino", "Embedded Systems", "IoT"].includes(name)) return "Electronics";
-      if (["UI/UX", "Graphic Design", "Photography"].includes(name)) return "Design & Arts";
-      return "Other";
+      const lower = name.toLowerCase();
+      if (["react", "javascript", "html & css", "html/css", "python", "java", "data structures", "c/c++", "typescript", "c++", "algorithms", "competitive programming", "networking", "linux", "cybersecurity basics", "git", "sql", "data analysis", "data visualization"].some(s => lower.includes(s))) return "Programming";
+      if (["machine learning", "computer vision", "tensorflow", "deep learning", "ai"].some(s => lower.includes(s))) return "AI & ML";
+      if (["arduino", "embedded systems", "iot", "electronics", "robotics", "embedded c", "pcb design"].some(s => lower.includes(s))) return "Electronics";
+      if (["ui/ux", "graphic design", "figma", "prototyping", "photography", "video editing", "canva", "content creation"].some(s => lower.includes(s))) return "Design";
+      if (["business", "product strategy", "marketing"].some(s => lower.includes(s))) return "Business";
+      if (["languages", "english", "spanish"].some(s => lower.includes(s))) return "Languages";
+      return "Programming";
     };
 
     for (const u of demoUsers) {
       const { uid, ...profile } = u;
       await setDoc(doc(firestore, "users", uid), {
         ...profile,
-        email: `${uid}@college.edu`,
+        email: `${uid.split("-")[1]}.demo@skillswap.local`,
         onboardingCompleted: true,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -493,7 +562,7 @@ export const api = {
         await addDoc(collection(firestore, "skills"), {
           name: skillName,
           category: getCategory(skillName),
-          description: `Learn ${skillName} with me! I have worked on multiple projects.`,
+          description: `I can help beginners and intermediate students with ${skillName} fundamentals, practical applications, and problem solving.`,
           level: "Intermediate",
           availability: profile.availability,
           teacherId: uid,
@@ -509,7 +578,7 @@ export const api = {
         await addDoc(collection(firestore, "skills"), {
           name: skillName,
           category: getCategory(skillName),
-          description: `I want to learn ${skillName} for my projects.`,
+          description: `I want to learn ${skillName} to apply it to my projects and coursework.`,
           level: "Beginner",
           availability: profile.availability,
           teacherId: uid,
