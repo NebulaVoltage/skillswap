@@ -802,19 +802,16 @@ function DiscoverPage() {
   const filteredSkills = useMemo(
     () =>
       skills.filter((skill) => {
-        // Only show "teach" skills from OTHER users
-        if ((skill as any).type !== "teach") return false;
-        if (skill.teacherId === currentUser?.uid) return false;
         const byFilter = selectedFilter === "All" || skill.category === selectedFilter;
         const query = search.toLowerCase();
         const bySearch =
           !query ||
           skill.name.toLowerCase().includes(query) ||
-          (skill.description || "").toLowerCase().includes(query) ||
-          (skill.tags || []).some((tag) => tag.toLowerCase().includes(query));
+          skill.description.toLowerCase().includes(query) ||
+          skill.tags.some((tag) => tag.toLowerCase().includes(query));
         return byFilter && bySearch;
       }),
-    [search, selectedFilter, skills, currentUser?.uid],
+    [search, selectedFilter, skills],
   );
 
   return (
@@ -853,19 +850,9 @@ function DiscoverPage() {
       </div>
       <div className="discover-layout">
         <div className="skill-grid">
-          {filteredSkills.length === 0 && (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-              <Compass size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
-              <p style={{ fontWeight: 600, fontSize: '1.1rem', marginBottom: 6 }}>No skills found</p>
-              <p style={{ fontSize: '0.9rem' }}>Try a different filter or search term.</p>
-            </div>
-          )}
           {filteredSkills.map((skill) => {
             const teacher = students.find((student) => student.id === skill.teacherId);
-            // Use graceful fallback while students are loading — don't silently drop the card
-            const teacherName = teacher?.name ?? (skill.teacherId?.startsWith('demo-') ? skill.teacherId.replace('demo-', '').replace(/^\w/, (c: string) => c.toUpperCase()) : 'Student');
-            const teacherAvatar = teacher?.avatar ?? teacherName.slice(0, 2).toUpperCase();
-            const teacherRating = teacher?.rating ?? 4.8;
+            if (!teacher) return null;
             return (
               <article className="skill-card" key={skill.id}>
                 <div className="skill-card-top">
@@ -876,32 +863,36 @@ function DiscoverPage() {
                       <p>{skill.category}</p>
                     </div>
                   </div>
-                  <button className="icon-button small" aria-label="Bookmark">
-                    <Heart size={16} fill={(skill as any).bookmarked ? "currentColor" : "none"} />
+                  <button className="icon-button small">
+                    <Heart size={16} fill={skill.bookmarked ? "currentColor" : "none"} />
                   </button>
                 </div>
                 <p className="muted-copy">{skill.description}</p>
                 <div className="teacher-row">
-                  <span className="avatar-chip">{teacherAvatar}</span>
+                  <span className="avatar-chip">{teacher.avatar}</span>
                   <div>
-                    <strong>{teacherName}</strong>
+                    <strong>{teacher.name}</strong>
                     <small>
-                      <Star size={12} /> {teacherRating} • {skill.level}
+                      <Star size={12} /> {teacher.rating} • {skill.level}
                     </small>
                   </div>
                 </div>
                 <div className="tag-row">
-                  {(skill.tags || []).map((tag) => (
+                  {skill.tags.map((tag) => (
                     <span className="tag" key={tag}>
                       {tag}
                     </span>
                   ))}
                 </div>
                 <div className="skill-card-footer">
-                  <small>{skill.availability} • {skill.learners ?? 0} learners</small>
-                  <button className="ghost-button" onClick={() => setRequestingSkill(skill)}>
-                    Request to Learn
-                  </button>
+                  <small>{skill.availability} • {skill.learners} learners</small>
+                  {currentUser?.uid === skill.teacherId ? (
+                    <span className="subtle-chip" style={{ fontSize: '0.8rem', padding: '4px 8px' }}>Your Skill</span>
+                  ) : (
+                    <button className="ghost-button" onClick={() => setRequestingSkill(skill)}>
+                      Request to Learn
+                    </button>
+                  )}
                 </div>
               </article>
             );

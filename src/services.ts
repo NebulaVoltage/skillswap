@@ -405,14 +405,12 @@ export const api = {
 
   async seedDemoData() {
     const firestore = requireDb();
-
-    // Use a version marker doc to check if the FULL 10-user seed has been applied
-    const versionDoc = await getDoc(doc(firestore, "users", "demo-vikram"));
-    if (versionDoc.exists()) {
-      return; // All 10 profiles already seeded
+    const rahulSnap = await getDoc(doc(firestore, "users", "demo-rahul"));
+    if (rahulSnap.exists()) {
+      return; // Already seeded
     }
 
-    // Clean up old demo skills to prevent duplicates
+    // Clean up any existing demo skills to prevent duplicates
     try {
       const skillsSnap = await getDocs(collection(firestore, "skills"));
       for (const d of skillsSnap.docs) {
@@ -462,7 +460,7 @@ export const api = {
       {
         uid: "demo-priya",
         name: "Priya Nair",
-        bio: "Creative designer building beautiful digital products and delightful user experiences.",
+        bio: "Creative designer interested in building beautiful digital products and user experiences.",
         college: "PES University",
         yearOfStudy: "4th Year",
         avatar: "PN",
@@ -478,7 +476,7 @@ export const api = {
         yearOfStudy: "3rd Year",
         avatar: "KV",
         teachSkills: ["JavaScript", "React", "TypeScript", "HTML/CSS"],
-        learnSkills: ["Python", "Machine Learning"],
+        learnSkills: ["Python", "AI"],
         availability: "Weekdays"
       },
       {
@@ -495,7 +493,7 @@ export const api = {
       {
         uid: "demo-aditya",
         name: "Aditya Kumar",
-        bio: "Cybersecurity learner passionate about ethical hacking, networking, and secure development.",
+        bio: "Cybersecurity learner interested in ethical security, networking, and secure development.",
         college: "VIT Vellore",
         yearOfStudy: "3rd Year",
         avatar: "AK",
@@ -506,7 +504,7 @@ export const api = {
       {
         uid: "demo-sneha",
         name: "Sneha Patel",
-        bio: "Content creator and photographer combining technology with visual storytelling.",
+        bio: "Content creator and photographer who enjoys combining technology with visual storytelling.",
         college: "NID Ahmedabad",
         yearOfStudy: "4th Year",
         avatar: "SP",
@@ -517,7 +515,7 @@ export const api = {
       {
         uid: "demo-vikram",
         name: "Vikram Singh",
-        bio: "Competitive programmer who loves algorithms, system design, and cracking tough problems.",
+        bio: "Competitive programmer and software engineering enthusiast who enjoys algorithms and problem solving.",
         college: "IIT Bombay",
         yearOfStudy: "4th Year",
         avatar: "VS",
@@ -538,46 +536,38 @@ export const api = {
       }
     ];
 
-    // Category must EXACTLY match the filter chips: "Programming", "AI & ML", "Electronics", "Design", "Business", "Languages"
     const getCategory = (name: string) => {
       const lower = name.toLowerCase();
-      if (["react", "javascript", "html/css", "html & css", "python", "java", "data structures", "c/c++", "typescript", "c++", "algorithms", "competitive programming", "networking", "linux", "cybersecurity basics", "git", "sql", "data analysis", "data visualization", "frontend development"].some(s => lower.includes(s))) return "Programming";
-      if (["machine learning", "computer vision", "tensorflow", "deep learning", "ai", "cloud computing", "cloud security", "penetration testing", "embedded ai"].some(s => lower.includes(s))) return "AI & ML";
+      if (["react", "javascript", "html & css", "html/css", "python", "java", "data structures", "c/c++", "typescript", "c++", "algorithms", "competitive programming", "networking", "linux", "cybersecurity basics", "git", "sql", "data analysis", "data visualization"].some(s => lower.includes(s))) return "Programming";
+      if (["machine learning", "computer vision", "tensorflow", "deep learning", "ai"].some(s => lower.includes(s))) return "AI & ML";
       if (["arduino", "embedded systems", "iot", "electronics", "robotics", "embedded c", "pcb design"].some(s => lower.includes(s))) return "Electronics";
-      if (["ui/ux", "figma", "graphic design", "prototyping", "photography", "video editing", "canva", "content creation"].some(s => lower.includes(s))) return "Design";
+      if (["ui/ux", "graphic design", "figma", "prototyping", "photography", "video editing", "canva", "content creation"].some(s => lower.includes(s))) return "Design";
       if (["business", "product strategy", "marketing"].some(s => lower.includes(s))) return "Business";
+      if (["languages", "english", "spanish"].some(s => lower.includes(s))) return "Languages";
       return "Programming";
-    };
-
-    const getDescription = (skillName: string, type: "teach" | "learn") => {
-      if (type === "teach") {
-        return `I can help you with ${skillName} — from fundamentals to real-world applications. Happy to do live sessions and code reviews!`;
-      }
-      return `I'm actively learning ${skillName} and would love to swap skills. I can teach you something in return!`;
     };
 
     for (const u of demoUsers) {
       const { uid, ...profile } = u;
-      // Use setDoc with merge so we don't wipe any extra fields
       await setDoc(doc(firestore, "users", uid), {
         ...profile,
-        email: `${uid.replace("demo-", "")}.demo@skillswap.local`,
+        email: `${uid.split("-")[1]}.demo@skillswap.local`,
         onboardingCompleted: true,
-        rating: parseFloat((4.5 + Math.random() * 0.5).toFixed(1)),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      }, { merge: true });
+      });
 
+      // Add their skills to the skills collection
       for (const skillName of profile.teachSkills) {
         await addDoc(collection(firestore, "skills"), {
           name: skillName,
           category: getCategory(skillName),
-          description: getDescription(skillName, "teach"),
-          level: ["Beginner", "Intermediate", "Advanced"][Math.floor(Math.random() * 3)],
+          description: `I can help beginners and intermediate students with ${skillName} fundamentals, practical applications, and problem solving.`,
+          level: "Intermediate",
           availability: profile.availability,
           teacherId: uid,
-          learners: Math.floor(3 + Math.random() * 15),
-          tags: [skillName, profile.college, getCategory(skillName)],
+          learners: 5,
+          tags: [skillName, "Demo"],
           type: "teach",
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
@@ -588,12 +578,12 @@ export const api = {
         await addDoc(collection(firestore, "skills"), {
           name: skillName,
           category: getCategory(skillName),
-          description: getDescription(skillName, "learn"),
+          description: `I want to learn ${skillName} to apply it to my projects and coursework.`,
           level: "Beginner",
           availability: profile.availability,
           teacherId: uid,
           learners: 0,
-          tags: [skillName, profile.college],
+          tags: [skillName, "Demo"],
           type: "learn",
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
@@ -602,4 +592,3 @@ export const api = {
     }
   }
 };
-
