@@ -802,8 +802,8 @@ function DiscoverPage() {
   const filteredSkills = useMemo(
     () =>
       skills.filter((skill) => {
-        // Only show "teach" skills from OTHER users
-        if ((skill as any).type !== "teach") return false;
+        // Exclude "learn" skills — show teach skills AND skills with no type (old data)
+        if ((skill as any).type === "learn") return false;
         if (skill.teacherId === currentUser?.uid) return false;
         const byFilter = selectedFilter === "All" || skill.category === selectedFilter;
         const query = search.toLowerCase();
