@@ -1,0 +1,490 @@
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  addDoc,
+  serverTimestamp,
+  onSnapshot,
+  orderBy
+} from "firebase/firestore";
+import { db } from "./lib/firebase";
+import type { Student, Skill } from "./types";
+
+function requireDb() {
+  if (!db) {
+    throw new Error("Firestore is not initialized.");
+  }
+  return db;
+}
+
+export function mapFirestoreUserToStudent(uid: string, data: any): Student {
+  return {
+    id: uid,
+    name: data.name || "Student",
+    headline: data.headline || `${data.yearOfStudy || "Student"} • ${data.college || "College"}`,
+    location: data.location || "Bengaluru",
+    college: data.college || "",
+    year: data.yearOfStudy || "",
+    rating: data.rating || 5.0,
+    responseRate: data.responseRate || "100%",
+    availability: data.availability || "Flexible",
+    avatar: data.avatar || (data.name ? data.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() : "SS"),
+    about: data.bio || "Tell the SkillSwap community what you love building and what you want to learn.",
+    teachSkills: data.teachSkills || [],
+    learnSkills: data.learnSkills || [],
+    projects: data.projects || [],
+    reviews: data.reviews || [],
+    reputation: data.reputation || {
+      xp: 2480,
+      level: 12,
+      title: "Knowledge Builder"
+    }
+  };
+}
+
+export const api = {
+  async getUsers() {
+    const firestore = requireDb();
+    const snapshot = await getDocs(collection(firestore, "users"));
+    return snapshot.docs.map(doc => mapFirestoreUserToStudent(doc.id, doc.data()));
+  },
+
+  async getUser(id: string) {
+    const firestore = requireDb();
+    const snap = await getDoc(doc(firestore, "users", id));
+    if (!snap.exists()) {
+      throw new Error("User does not exist");
+    }
+    return mapFirestoreUserToStudent(snap.id, snap.data());
+  },
+
+  async getSkills() {
+    const firestore = requireDb();
+    const snapshot = await getDocs(collection(firestore, "skills"));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Skill));
+  },
+
+  async getRequests() {
+    const firestore = requireDb();
+    const snapshot = await getDocs(collection(firestore, "requests"));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+  },
+
+  async getMatches() {
+    return [];
+  },
+
+  async getMessages() {
+    return [];
+  },
+
+  // Subscriptions
+  subscribeUsers(callback: (users: Student[]) => void) {
+    const firestore = requireDb();
+    return onSnapshot(collection(firestore, "users"), (snapshot) => {
+      const list = snapshot.docs.map(doc => mapFirestoreUserToStudent(doc.id, doc.data()));
+      callback(list);
+    });
+  },
+
+  subscribeSkills(callback: (skills: Skill[]) => void) {
+    const firestore = requireDb();
+    return onSnapshot(collection(firestore, "skills"), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Skill));
+      callback(list);
+    });
+  },
+
+  subscribeRequests(uid: string, callback: (requests: any[]) => void) {
+    const firestore = requireDb();
+    const q1 = query(collection(firestore, "requests"), where("senderId", "==", uid));
+    const q2 = query(collection(firestore, "requests"), where("receiverId", "==", uid));
+
+    let r1: any[] = [];
+    let r2: any[] = [];
+
+    const updateAndCallback = () => {
+      // De-duplicate by request ID
+      const merged = [...r1, ...r2];
+      const seen = new Set();
+      const unique = merged.filter(item => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+      callback(unique);
+    };
+
+    const unsub1 = onSnapshot(q1, (snap) => {
+      r1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      updateAndCallback();
+    });
+
+    const unsub2 = onSnapshot(q2, (snap) => {
+      r2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      updateAndCallback();
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  },
+
+  subscribeConversations(uid: string, callback: (conversations: any[]) => void) {
+    const firestore = requireDb();
+    const q = query(
+      collection(firestore, "conversations"),
+      where("participantIds", "array-contains", uid)
+    );
+    return onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(list);
+    });
+  },
+
+  subscribeMessages(conversationId: string, callback: (messages: any[]) => void) {
+    const firestore = requireDb();
+    const q = query(
+      collection(firestore, "conversations", conversationId, "messages"),
+      orderBy("createdAt", "asc")
+    );
+    return onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(list);
+    });
+  },
+
+  // Actions
+  async addSkill(skill: Omit<Skill, "id" | "learners" | "tags"> & { type: "teach" | "learn" }) {
+    const firestore = requireDb();
+    const docRef = await addDoc(collection(firestore, "skills"), {
+      ...skill,
+      learners: 0,
+      tags: [skill.category, skill.level],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    // Also update student profile
+    const userDocRef = doc(firestore, "users", skill.teacherId);
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      const currentSkills = skill.type === "teach" ? (userData.teachSkills || []) : (userData.learnSkills || []);
+      if (!currentSkills.includes(skill.name)) {
+        currentSkills.push(skill.name);
+        await updateDoc(userDocRef, {
+          [skill.type === "teach" ? "teachSkills" : "learnSkills"]: currentSkills,
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+
+    return docRef.id;
+  },
+
+  async editSkill(skillId: string, skill: Partial<Skill> & { type: "teach" | "learn" }) {
+    const firestore = requireDb();
+    await updateDoc(doc(firestore, "skills", skillId), {
+      ...skill,
+      updatedAt: serverTimestamp()
+    });
+
+    // Also update student profile list if name changes
+    if (skill.name && skill.teacherId) {
+      const userDocRef = doc(firestore, "users", skill.teacherId);
+      const userSnap = await getDoc(userDocRef);
+      if (userSnap.exists()) {
+        // Just sync all skills of this type
+        const skillsSnap = await getDocs(
+          query(
+            collection(firestore, "skills"),
+            where("teacherId", "==", skill.teacherId),
+            where("type", "==", skill.type)
+          )
+        );
+        const names = skillsSnap.docs.map(d => d.data().name);
+        await updateDoc(userDocRef, {
+          [skill.type === "teach" ? "teachSkills" : "learnSkills"]: names,
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+  },
+
+  async deleteSkill(skillId: string, teacherId: string, name: string, type: "teach" | "learn") {
+    const firestore = requireDb();
+    await deleteDoc(doc(firestore, "skills", skillId));
+
+    const userDocRef = doc(firestore, "users", teacherId);
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      const currentSkills = type === "teach" ? (userData.teachSkills || []) : (userData.learnSkills || []);
+      const updatedSkills = currentSkills.filter((s: string) => s !== name);
+      await updateDoc(userDocRef, {
+        [type === "teach" ? "teachSkills" : "learnSkills"]: updatedSkills,
+        updatedAt: serverTimestamp()
+      });
+    }
+  },
+
+  async sendRequest(senderId: string, receiverId: string, skillId: string, message: string, skillName: string) {
+    const firestore = requireDb();
+    
+    // Check duplicate pending requests
+    const q = query(
+      collection(firestore, "requests"),
+      where("senderId", "==", senderId),
+      where("receiverId", "==", receiverId),
+      where("skillId", "==", skillId),
+      where("status", "==", "PENDING")
+    );
+    const dupCheck = await getDocs(q);
+    if (!dupCheck.empty) {
+      throw new Error("You already have a pending request for this skill.");
+    }
+
+    const docRef = await addDoc(collection(firestore, "requests"), {
+      senderId,
+      receiverId,
+      skillId,
+      skillName,
+      message,
+      status: "PENDING",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    // Create a notification for the receiver
+    try {
+      const senderSnap = await getDoc(doc(firestore, "users", senderId));
+      const senderName = senderSnap.exists() ? senderSnap.data().name : "A student";
+      await addDoc(collection(firestore, "notifications"), {
+        userId: receiverId,
+        type: "new_request",
+        title: "New Skill Request",
+        message: `${senderName} wants to learn "${skillName}" from you.`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Failed to create request notification:", e);
+    }
+
+    return docRef.id;
+  },
+
+  async updateRequestStatus(requestId: string, status: "ACCEPTED" | "REJECTED" | "CANCELLED" | "COMPLETED", requestData?: any) {
+    const firestore = requireDb();
+    await updateDoc(doc(firestore, "requests", requestId), {
+      status,
+      updatedAt: serverTimestamp()
+    });
+
+    const finalRequestData = requestData || (await getDoc(doc(firestore, "requests", requestId))).data();
+
+    if (status === "ACCEPTED" && finalRequestData) {
+      // Deterministic conversation ID based on participant UIDs sorted alphabetically
+      const convId = [finalRequestData.senderId, finalRequestData.receiverId].sort().join("_");
+      const convRef = doc(firestore, "conversations", convId);
+      const convSnap = await getDoc(convRef);
+
+      if (!convSnap.exists()) {
+        await setDoc(convRef, {
+          participantIds: [finalRequestData.senderId, finalRequestData.receiverId],
+          skillId: finalRequestData.skillId,
+          topic: `${finalRequestData.skillName || "Skill Exchange"}`,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessage: "Conversation started.",
+          lastMessageAt: serverTimestamp(),
+          lastSenderId: ""
+        });
+      }
+    }
+
+    // Create a notification for the sender
+    try {
+      if (finalRequestData) {
+        const receiverSnap = await getDoc(doc(firestore, "users", finalRequestData.receiverId));
+        const receiverName = receiverSnap.exists() ? receiverSnap.data().name : "A student";
+
+        if (status === "ACCEPTED") {
+          await addDoc(collection(firestore, "notifications"), {
+            userId: finalRequestData.senderId,
+            type: "request_accepted",
+            title: "Request Accepted",
+            message: `Your request to learn "${finalRequestData.skillName}" was accepted by ${receiverName}.`,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        } else if (status === "REJECTED") {
+          await addDoc(collection(firestore, "notifications"), {
+            userId: finalRequestData.senderId,
+            type: "request_rejected",
+            title: "Request Declined",
+            message: `Your request to learn "${finalRequestData.skillName}" was declined.`,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to create status update notification:", e);
+    }
+  },
+
+  async sendMessage(conversationId: string, senderId: string, text: string) {
+    const firestore = requireDb();
+    await addDoc(collection(firestore, "conversations", conversationId, "messages"), {
+      senderId,
+      text,
+      createdAt: serverTimestamp()
+    });
+
+    await updateDoc(doc(firestore, "conversations", conversationId), {
+      lastMessage: text,
+      lastMessageAt: serverTimestamp(),
+      lastSenderId: senderId,
+      updatedAt: serverTimestamp()
+    });
+
+    // Create a notification for the receiver
+    try {
+      const convSnap = await getDoc(doc(firestore, "conversations", conversationId));
+      if (convSnap.exists()) {
+        const convData = convSnap.data();
+        const receiverId = convData.participantIds.find((id: string) => id !== senderId);
+        
+        const senderSnap = await getDoc(doc(firestore, "users", senderId));
+        const senderName = senderSnap.exists() ? senderSnap.data().name : "Someone";
+
+        if (receiverId) {
+          await addDoc(collection(firestore, "notifications"), {
+            userId: receiverId,
+            type: "new_message",
+            title: "New Message",
+            message: `${senderName}: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to create message notification:", e);
+    }
+  },
+
+  subscribeNotifications(uid: string, callback: (notifications: any[]) => void) {
+    const firestore = requireDb();
+    const q = query(
+      collection(firestore, "notifications"),
+      where("userId", "==", uid),
+      orderBy("createdAt", "desc")
+    );
+    return onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(list);
+    });
+  },
+
+  async markNotificationAsRead(notificationId: string) {
+    const firestore = requireDb();
+    await updateDoc(doc(firestore, "notifications", notificationId), {
+      read: true
+    });
+  },
+
+  async seedDemoData() {
+    const firestore = requireDb();
+    const usersSnap = await getDocs(collection(firestore, "users"));
+    if (usersSnap.size > 2) {
+      return; // Already seeded or has users
+    }
+
+    const demoUsers = [
+      {
+        uid: "demo-rahul",
+        name: "Rahul Sharma",
+        bio: "Full-stack developer who loves building web apps and hackathon prototypes.",
+        college: "Delhi Technological University",
+        yearOfStudy: "2nd Year",
+        avatar: "RS",
+        teachSkills: ["React", "JavaScript", "HTML & CSS"],
+        learnSkills: ["Machine Learning", "Python"]
+      },
+      {
+        uid: "demo-sarah",
+        name: "Sarah Khan",
+        bio: "Computer Science senior interested in computer vision, deep learning, and teaching.",
+        college: "IIIT Hyderabad",
+        yearOfStudy: "4th Year",
+        avatar: "SK",
+        teachSkills: ["Python", "Computer Vision", "Machine Learning"],
+        learnSkills: ["Public Speaking", "Product Strategy"]
+      },
+      {
+        uid: "demo-arjun",
+        name: "Arjun Rao",
+        bio: "Electronics enthusiast. Building embedded devices and smart IoT automation projects.",
+        college: "RV College of Engineering",
+        yearOfStudy: "3rd Year",
+        avatar: "AR",
+        teachSkills: ["Arduino", "Electronics", "IoT"],
+        learnSkills: ["React", "Cloud Computing"]
+      }
+    ];
+
+    for (const u of demoUsers) {
+      const { uid, ...profile } = u;
+      await setDoc(doc(firestore, "users", uid), {
+        ...profile,
+        email: `${uid}@college.edu`,
+        onboardingCompleted: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Add their skills to the skills collection
+      for (const skillName of profile.teachSkills) {
+        await addDoc(collection(firestore, "skills"), {
+          name: skillName,
+          category: skillName === "React" || skillName === "JavaScript" || skillName === "HTML & CSS" ? "Programming" : (skillName === "Arduino" || skillName === "Electronics" || skillName === "IoT" ? "Electronics" : "AI & ML"),
+          description: `Learn ${skillName} with me! I have worked on multiple projects.`,
+          level: "Intermediate",
+          availability: "Flexible",
+          teacherId: uid,
+          learners: 5,
+          tags: [skillName, "Demo"],
+          type: "teach",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      for (const skillName of profile.learnSkills) {
+        await addDoc(collection(firestore, "skills"), {
+          name: skillName,
+          category: skillName === "React" ? "Programming" : "AI & ML",
+          description: `I want to learn ${skillName} for my upcoming semester projects.`,
+          level: "Beginner",
+          availability: "Flexible",
+          teacherId: uid,
+          learners: 0,
+          tags: [skillName, "Demo"],
+          type: "learn",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+  }
+};
