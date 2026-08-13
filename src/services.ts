@@ -406,11 +406,10 @@ export const api = {
   async seedDemoData() {
     const firestore = requireDb();
 
-    // Version marker — bump this number to force a re-seed
-    const SEED_VERSION = "v3";
-    const versionDoc = await getDoc(doc(firestore, "users", "__seed_version__"));
-    if (versionDoc.exists() && versionDoc.data()?.version === SEED_VERSION) {
-      return; // Already fully seeded at this version
+    // Use a version marker doc to check if the FULL 10-user seed has been applied
+    const versionDoc = await getDoc(doc(firestore, "users", "demo-vikram"));
+    if (versionDoc.exists()) {
+      return; // All 10 profiles already seeded
     }
 
     // Clean up old demo skills to prevent duplicates
@@ -425,7 +424,6 @@ export const api = {
     } catch (e) {
       console.error("Clean up of demo skills failed:", e);
     }
-
 
     const demoUsers = [
       {
@@ -602,9 +600,6 @@ export const api = {
         });
       }
     }
-    // Mark this seed version as complete
-    await setDoc(doc(firestore, "users", "__seed_version__"), { version: SEED_VERSION, seededAt: serverTimestamp() });
   }
 };
-
 
