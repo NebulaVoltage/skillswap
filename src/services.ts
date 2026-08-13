@@ -405,9 +405,22 @@ export const api = {
 
   async seedDemoData() {
     const firestore = requireDb();
-    const usersSnap = await getDocs(collection(firestore, "users"));
-    if (usersSnap.size > 2) {
-      return; // Already seeded or has users
+    const rahulSnap = await getDoc(doc(firestore, "users", "demo-rahul"));
+    if (rahulSnap.exists()) {
+      return; // Already seeded
+    }
+
+    // Clean up any existing demo skills to prevent duplicates
+    try {
+      const skillsSnap = await getDocs(collection(firestore, "skills"));
+      for (const d of skillsSnap.docs) {
+        const data = d.data();
+        if (data.teacherId && data.teacherId.startsWith("demo-")) {
+          await deleteDoc(doc(firestore, "skills", d.id));
+        }
+      }
+    } catch (e) {
+      console.error("Clean up of demo skills failed:", e);
     }
 
     const demoUsers = [
@@ -419,29 +432,51 @@ export const api = {
         yearOfStudy: "2nd Year",
         avatar: "RS",
         teachSkills: ["React", "JavaScript", "HTML & CSS"],
-        learnSkills: ["Machine Learning", "Python"]
+        learnSkills: ["Machine Learning", "Python"],
+        availability: "Flexible"
       },
       {
-        uid: "demo-sarah",
-        name: "Sarah Khan",
-        bio: "Computer Science senior interested in computer vision, deep learning, and teaching.",
+        uid: "demo-ananya",
+        name: "Ananya Reddy",
+        bio: "Deep learning engineer. Enthusiastic about computer vision and NLP applications.",
         college: "IIIT Hyderabad",
         yearOfStudy: "4th Year",
-        avatar: "SK",
-        teachSkills: ["Python", "Computer Vision", "Machine Learning"],
-        learnSkills: ["Public Speaking", "Product Strategy"]
+        avatar: "AR",
+        teachSkills: ["Python", "Machine Learning", "Embedded Systems"],
+        learnSkills: ["UI/UX", "Graphic Design"],
+        availability: "Weekends"
       },
       {
         uid: "demo-arjun",
         name: "Arjun Rao",
-        bio: "Electronics enthusiast. Building embedded devices and smart IoT automation projects.",
+        bio: "Hardware hacker. Building IoT devices and micro-controller modules.",
         college: "RV College of Engineering",
         yearOfStudy: "3rd Year",
-        avatar: "AR",
-        teachSkills: ["Arduino", "Electronics", "IoT"],
-        learnSkills: ["React", "Cloud Computing"]
+        avatar: "AJ",
+        teachSkills: ["Arduino", "Embedded Systems", "IoT"],
+        learnSkills: ["React", "Python"],
+        availability: "Flexible"
+      },
+      {
+        uid: "demo-priya",
+        name: "Priya Nair",
+        bio: "UI/UX designer. Making interfaces accessible, clean, and delightful.",
+        college: "PES University",
+        yearOfStudy: "4th Year",
+        avatar: "PN",
+        teachSkills: ["UI/UX", "Graphic Design", "Photography"],
+        learnSkills: ["React", "JavaScript"],
+        availability: "Flexible"
       }
     ];
+
+    const getCategory = (name: string) => {
+      if (["React", "JavaScript", "HTML & CSS", "Python"].includes(name)) return "Programming";
+      if (["Machine Learning"].includes(name)) return "AI & ML";
+      if (["Arduino", "Embedded Systems", "IoT"].includes(name)) return "Electronics";
+      if (["UI/UX", "Graphic Design", "Photography"].includes(name)) return "Design & Arts";
+      return "Other";
+    };
 
     for (const u of demoUsers) {
       const { uid, ...profile } = u;
@@ -457,10 +492,10 @@ export const api = {
       for (const skillName of profile.teachSkills) {
         await addDoc(collection(firestore, "skills"), {
           name: skillName,
-          category: skillName === "React" || skillName === "JavaScript" || skillName === "HTML & CSS" ? "Programming" : (skillName === "Arduino" || skillName === "Electronics" || skillName === "IoT" ? "Electronics" : "AI & ML"),
+          category: getCategory(skillName),
           description: `Learn ${skillName} with me! I have worked on multiple projects.`,
           level: "Intermediate",
-          availability: "Flexible",
+          availability: profile.availability,
           teacherId: uid,
           learners: 5,
           tags: [skillName, "Demo"],
@@ -473,10 +508,10 @@ export const api = {
       for (const skillName of profile.learnSkills) {
         await addDoc(collection(firestore, "skills"), {
           name: skillName,
-          category: skillName === "React" ? "Programming" : "AI & ML",
-          description: `I want to learn ${skillName} for my upcoming semester projects.`,
+          category: getCategory(skillName),
+          description: `I want to learn ${skillName} for my projects.`,
           level: "Beginner",
-          availability: "Flexible",
+          availability: profile.availability,
           teacherId: uid,
           learners: 0,
           tags: [skillName, "Demo"],

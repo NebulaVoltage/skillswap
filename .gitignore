@@ -8,3 +8,6 @@ tsconfig.app.tsbuildinfo
 *.log
 .firebase
 .gemini
+
+.vercel
+.env*
